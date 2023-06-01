@@ -478,16 +478,7 @@ mod test {
         assert_eq!(
             invalid_prover.verify(),
             Err(vec![VerifyFailure::ConstraintNotSatisfied {
-                constraint: (
-                    (
-                        7,
-                        "verifies that `check` from current config equal to is_lt from LtChip"
-                    )
-                        .into(),
-                    0,
-                    ""
-                )
-                    .into(),
+                constraint: ((7, "lt constraint").into(), 0, "").into(),
                 location: FailureLocation::InRegion {
                     region: (18, "enforce sum to be less than total assets").into(),
                     offset: 0

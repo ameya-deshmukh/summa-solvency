@@ -1,11 +1,3 @@
-/*
-An easy-to-use implementation of the Poseidon Hash in the form of a Halo2 Chip. While the Poseidon Hash function
-is already implemented in halo2_gadgets, there is no wrapper chip that makes it easy to use in other circuits.
-*/
-
-// This chip adds a set of advice columns to the gadget Chip to store the inputs of the hash
-// compared to `hash_with_instance` this version doesn't use any instance column.
-
 use halo2_gadgets::poseidon::{primitives::*, Hash, Pow5Chip, Pow5Config};
 use halo2_proofs::halo2curves::bn256::Fr as Fp;
 use halo2_proofs::{circuit::*, plonk::*};
@@ -13,15 +5,17 @@ use std::marker::PhantomData;
 
 #[derive(Debug, Clone)]
 
-// WIDTH, RATE and L are const generics for the struct, which represent the width, rate, and number of inputs for the Poseidon hash function, respectively.
-// This means they are values that are known at compile time and can be used to specialize the implementation of the struct.
-// The actual chip provided by halo2_gadgets is added to the parent Chip.
+/// Defines the configuration of the PoseidonConfig.
+/// It is a wrapper around the Pow5Config from [halo2_gadgets::poseidon::Pow5Config].
+/// It is parametrized by the width, rate, and number of inputs for the Poseidon hash function.
+/// For example, in the case of a Poseidon Hasher with 4 inputs. WIDTH = 5, RATE = 4, L = 4.
 pub struct PoseidonConfig<const WIDTH: usize, const RATE: usize, const L: usize> {
     pow5_config: Pow5Config<Fp, WIDTH, RATE>,
 }
 
 #[derive(Debug, Clone)]
 
+/// Implementation of the PoseidonChip that defines the constraints for the PoseidonChip and the witness assignement functions
 pub struct PoseidonChip<
     S: Spec<Fp, WIDTH, RATE>,
     const WIDTH: usize,
@@ -42,7 +36,7 @@ impl<S: Spec<Fp, WIDTH, RATE>, const WIDTH: usize, const RATE: usize, const L: u
         }
     }
 
-    // Configuration of the PoseidonChip
+    /// Wrapper for configuring the Pow5Chip from [halo2_gadgets::poseidon::Pow5Chip]
     pub fn configure(
         meta: &mut ConstraintSystem<Fp>,
         hash_inputs: Vec<Column<Advice>>,
@@ -67,9 +61,7 @@ impl<S: Spec<Fp, WIDTH, RATE>, const WIDTH: usize, const RATE: usize, const L: u
         PoseidonConfig { pow5_config }
     }
 
-    // L is the number of inputs to the hash function
-    // Takes the cells containing the input values of the hash function and return the cell containing the hash output
-    // It uses the pow5_chip to compute the hash
+    /// Assigns the `input_cells` as input to the hashing function of the `pow_5_chip` and returns the output cell
     pub fn hash(
         &self,
         mut layouter: impl Layouter<Fp>,

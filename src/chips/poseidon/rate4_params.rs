@@ -1,16 +1,14 @@
-//! Parameters for using rate 4 Poseidon with the BN256 field.
-//! Patterned after [halo2_gadgets::poseidon::primitives::fp]
-//! The parameters can be reproduced by running the following Sage script from
-//! [this repository](https://github.com/daira/pasta-hadeshash):
-//!
-//! ```text
-//! $ sage generate_parameters_grain.sage 1 0 254 5 8 60 0x30644e72e131a029b85045b68181585d2833e84879b9709143e1f593f0000001 --rust
-//! ```
-//!
-//! where 1 means "prime field", 0 means "non-negative sbox", 254 is the bitsize
-//! of the field, 5 is the Poseidon width (rate + 1), 8 is the number of full
-//! rounds, 60 is the number of partial rounds.
-//! More info here => https://hackmd.io/@letargicus/SJOvx48Nn
+/// The parameters can be reproduced by running the following Sage script from
+/// [pasta-hadeshash](https://github.com/daira/pasta-hadeshash):
+///
+/// ```text
+/// $ sage generate_parameters_grain.sage 1 0 254 5 8 60 0x30644e72e131a029b85045b68181585d2833e84879b9709143e1f593f0000001 --rust
+/// ```
+///
+/// where 1 means "prime field", 0 means "non-negative sbox", 254 is the bitsize
+/// of the field, 5 is the Poseidon width (rate + 1), 8 is the number of full
+/// rounds, 60 is the number of partial rounds.
+/// More info here => https://hackmd.io/@letargicus/SJOvx48Nn
 use halo2_proofs::halo2curves::bn256::Fr as Fp;
 
 // Number of round constants: 340

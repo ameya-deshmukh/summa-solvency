@@ -1,12 +1,11 @@
-//! Specification for rate 4 Poseidon using the BN256 curve.
-//! Patterned after [halo2_gadgets::poseidon::primitives::P128Pow5T3]
-
 use crate::chips::poseidon::rate4_params;
 use halo2_gadgets::poseidon::primitives::*;
 use halo2_proofs::arithmetic::Field;
 use halo2_proofs::halo2curves::bn256::Fr as Fp;
 
 #[derive(Debug, Clone, Copy)]
+
+/// Specification for a Poseidon Hasher with width 5, rate 4, and 4 inputs based on the bn256 curve.
 pub struct MySpec;
 
 pub(crate) type Mds<Fp, const T: usize> = [[Fp; T]; T];

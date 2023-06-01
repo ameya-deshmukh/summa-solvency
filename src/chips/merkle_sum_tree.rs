@@ -8,17 +8,27 @@ const WIDTH: usize = 5;
 const RATE: usize = 4;
 const L: usize = 4;
 
+/// Defines the configuration of the MerkleSumTreeChip.
+/// Note that it makes use of configs from two external gadgets: PoseidonConfig and LtConfig
 #[derive(Debug, Clone)]
 pub struct MerkleSumTreeConfig {
     pub advice: [Column<Advice>; 5],
+    /// When toggled, constrains that a value in the current row in column e is binary.
     pub bool_selector: Selector,
+    /// When toggled, constrains the correct swapping between two consecutive row according to a binary index.
     pub swap_selector: Selector,
+    /// When toggled, constrains `b` + `d` = `e` at the current rotation.
     pub sum_selector: Selector,
+    /// When toggled, constraints that `c` = `is_lt`.
     pub lt_selector: Selector,
     pub instance: Column<Instance>,
     pub poseidon_config: PoseidonConfig<WIDTH, RATE, L>,
     pub lt_config: LtConfig<Fp, 8>,
 }
+
+/// Implementation of the MerkleSumTreeChip.
+/// Defines the constraints for the MerkleSumTreeChip and the witness assignement functions
+
 #[derive(Debug, Clone)]
 pub struct MerkleSumTreeChip {
     config: MerkleSumTreeConfig,
@@ -28,6 +38,18 @@ impl MerkleSumTreeChip {
     pub fn construct(config: MerkleSumTreeConfig) -> Self {
         Self { config }
     }
+
+    ///
+    /// Defines and return the configuration for the chip. It enforces the following constraints:
+    /// - `bool constraint` -> Enforces that e.cur() is either a 0 or 1. `s * e * (1 - e) = 0`
+    /// - `swap constraint` -> Enforces that `l1.next()=c.cur(), l2.next()=d.cur(), r1.next()=a.cur(), and r2.next()=b.cur()` if e is 0. Otherwise, `l1.next()=a.cur(), l2.next()=b.cur(), r1.next()=c.cur(), and r2.next()=d.cur()`.
+    /// - `sum constraint` -> Enforces that `b.cur() + d.cur() = e.cur()`
+    /// - `lt constraint` -> Enforces that `c.cur() = is_lt` from LtChip
+    ///
+    /// Furthermore:
+    /// - initiates the poseidon chip passing in the first #WIDTH advice columns
+    /// - initiates the lt chip passing a.cur() as lhs and b.cur() as rhs
+    ///
 
     pub fn configure(
         meta: &mut ConstraintSystem<Fp>,
@@ -57,16 +79,12 @@ impl MerkleSumTreeChip {
         meta.enable_equality(col_e);
         meta.enable_equality(instance);
 
-        // Enforces that e is either a 0 or 1 when the bool selector is enabled
-        // s * e * (1 - e) = 0
         meta.create_gate("bool constraint", |meta| {
             let s = meta.query_selector(bool_selector);
             let e = meta.query_advice(col_e, Rotation::cur());
             vec![s * e.clone() * (Expression::Constant(Fp::from(1)) - e)]
         });
 
-        // Enforces that if the swap bit (e) is on, l1=c, l2=d, r1=a, and r2=b. Otherwise, l1=a, l2=b, r1=c, and r2=d.
-        // This applies only when the swap selector is enabled
         meta.create_gate("swap constraint", |meta| {
             let s = meta.query_selector(swap_selector);
             let a = meta.query_advice(col_a, Rotation::cur());
@@ -85,7 +103,6 @@ impl MerkleSumTreeChip {
             ]
         });
 
-        // Enforces that input_left_balance + input_right_balance = computed_sum
         meta.create_gate("sum constraint", |meta| {
             let s = meta.query_selector(sum_selector);
             let left_balance = meta.query_advice(col_b, Rotation::cur());
@@ -98,7 +115,6 @@ impl MerkleSumTreeChip {
 
         let poseidon_config = PoseidonChip::<MySpec, WIDTH, RATE, L>::configure(meta, hash_inputs);
 
-        // configure lt chip
         let lt_config = LtChip::configure(
             meta,
             |meta| meta.query_selector(lt_selector),
@@ -117,20 +133,20 @@ impl MerkleSumTreeChip {
             lt_config,
         };
 
-        meta.create_gate(
-            "verifies that `check` from current config equal to is_lt from LtChip",
-            |meta| {
-                let q_enable = meta.query_selector(lt_selector);
+        meta.create_gate("lt constraint", |meta| {
+            let q_enable = meta.query_selector(lt_selector);
 
-                let check = meta.query_advice(col_c, Rotation::cur());
+            let check = meta.query_advice(col_c, Rotation::cur());
 
-                vec![q_enable * (config.lt_config.is_lt(meta, None) - check)]
-            },
-        );
+            vec![q_enable * (config.lt_config.is_lt(meta, None) - check)]
+        });
 
         config
     }
 
+    /// Witness assignment function that assigns the leaf hash and balance related to your entry to the execution trace
+    /// - leaf_hash -> a, 0
+    /// - leaf_balance -> b, 0
     pub fn assing_leaf_hash_and_balance(
         &self,
         mut layouter: impl Layouter<Fp>,
@@ -161,6 +177,13 @@ impl MerkleSumTreeChip {
         Ok((leaf_hash_cell, leaf_balance_cell))
     }
 
+    /// Witness assignment function that assigns the witness for a merkle prove level.
+    /// It takes the hash and balance from the previous level and the sibling element hash and balance to perform an hashing level
+    /// - At row 0 ->  `prev_hash, rev_balance, element_hash, element_balance`
+    /// - At row 1 ->  `hash_left, balance_left, hash_right, balance_right` by swapping the elements according to the binary index.
+    /// - Performs the hashing  `computed_hash = (hash_left, balance_left, hash_right, balance_right)`
+    /// - Calculates the sum    `computed_sum = balance_left + balance_right`
+    ///
     pub fn merkle_prove_layer(
         &self,
         mut layouter: impl Layouter<Fp>,
@@ -293,13 +316,13 @@ impl MerkleSumTreeChip {
         Ok((computed_hash, computed_sum_cell))
     }
 
-    // Enforce computed sum to be less than total assets passed inside the instance column
+    /// Witness assignment function that assigns the witness to enforce that the computed sum is less than the total assets
+    /// It takes the prev_computed_sum_cell as input and enforces that this cell is less than the total assets (passed as input to the instance column)
     pub fn enforce_less_than(
         &self,
         mut layouter: impl Layouter<Fp>,
         prev_computed_sum_cell: &AssignedCell<Fp, Fp>,
     ) -> Result<(), Error> {
-        // Initiate chip config
         let chip = LtChip::construct(self.config.lt_config);
 
         chip.load(&mut layouter)?;
@@ -356,7 +379,7 @@ impl MerkleSumTreeChip {
         Ok(())
     }
 
-    // Enforce copy constraint check between input cell and instance column at row passed as input
+    /// Function that enforce the copy constrain between an advise cell and a cell from the instance column
     pub fn expose_public(
         &self,
         mut layouter: impl Layouter<Fp>,
