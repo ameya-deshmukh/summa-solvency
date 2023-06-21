@@ -31,10 +31,12 @@ mod test {
     fn test_standard_on_chain_verifier() {
         let params = generate_setup_params(9);
 
-        let circuit = MstInclusionCircuit::<LEVELS, L, N_ASSETS>::init(
-            "src/merkle_sum_tree/csv/entry_16.csv",
-            0,
-        );
+        let circuit =
+            MstInclusionCircuit::<LEVELS, 4, 1>::init("src/merkle_sum_tree/csv/entry_16_1.csv", 0);
+
+        let valid_prover = MockProver::run(9, &circuit, circuit.instances()).unwrap();
+
+        valid_prover.assert_satisfied();
 
         let pk = gen_pk(&params, &circuit, None);
 
@@ -43,7 +45,7 @@ mod test {
 
         let proof_calldata = gen_evm_proof_shplonk(&params, &pk, circuit, instances.clone());
 
-        let deployment_code = gen_evm_verifier_shplonk::<MstInclusionCircuit<LEVELS, L, N_ASSETS>>(
+        let deployment_code = gen_evm_verifier_shplonk::<MstInclusionCircuit<LEVELS, 4, 1>>(
             &params,
             pk.get_vk(),
             num_instances,

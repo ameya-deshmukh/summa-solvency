@@ -8,10 +8,10 @@ use halo2_proofs::halo2curves::bn256::Fr as Fp;
 use halo2_proofs::plonk::{Advice, Circuit, Column, ConstraintSystem, Error, Instance};
 use snark_verifier_sdk::CircuitExt;
 
-const ACC_COLS: usize = 5;
+const ACC_COLS: usize = 4;
 const MAX_BITS: u8 = 8;
-const WIDTH: usize = 7;
-const RATE: usize = 6;
+const WIDTH: usize = 5;
+const RATE: usize = 4;
 
 // LEVELS indicates the levels of the tree
 // L is the length of the hasher input, namely 2 + (2 * N_ASSETS)
@@ -55,7 +55,7 @@ impl<const LEVELS: usize, const L: usize, const N_ASSETS: usize>
     }
 
     pub fn init(path: &str, user_index: usize) -> Self {
-        let merkle_sum_tree = MerkleSumTree::new(path).unwrap();
+        let merkle_sum_tree = MerkleSumTree::<N_ASSETS>::new(path).unwrap();
 
         let proof: MerkleProof<N_ASSETS> = merkle_sum_tree.generate_proof(user_index).unwrap();
 
@@ -91,6 +91,8 @@ impl<const L: usize, const N_ASSETS: usize> MstInclusionConfig<L, N_ASSETS> {
     pub fn configure(meta: &mut ConstraintSystem<Fp>) -> Self {
         // the max number of advices columns needed is WIDTH + 1 given requirement of the poseidon config
         let advices: [Column<Advice>; WIDTH + 1] = std::array::from_fn(|_| meta.advice_column());
+
+        meta.enable_equality(advices[WIDTH]);
 
         // in fact, the poseidon config requires #WIDTH advice columns for state and 1 for partial_sbox
         let poseidon_config = PoseidonChip::<PoseidonSpec, WIDTH, RATE, L>::configure(
